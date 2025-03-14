@@ -8,6 +8,8 @@ PicoShell is a simple Unix shell implemented in C as part of a system programmin
 - [Built-in Commands](#built-in-commands)
 - [Compilation and Installation](#compilation-and-installation)
 - [Testing](#testing)
+- [Example Output](#example-output)
+
 
 ## Features
 - **Interactive Shell:** Displays the current working directory and a prompt to the user.
@@ -48,3 +50,18 @@ After successful compilation, run the shell with:
 ## Testing
 - **Interactive Testing:** Run the shell and try commands like `ls`, `pwd`, `cd`, and `exit`.
 - **Error Cases:** Test scenarios such as using `cd` without an argument or entering an invalid command to see the error handling in action.
+
+## Example Output
+
+``` bash
+
+    \home\username\currentdir:$ echo Hello, World!
+    Hello, World!
+
+    \home\username\currentdir:$ pwd
+    \home\username\currentdir
+
+    \home\username\currentdir:$ exit
+    Exiting shell...
+
+```
