@@ -54,7 +54,6 @@ After successful compilation, run the shell with:
 ## Example Output
 
 ``` bash
-
     \home\username\currentdir:$ echo Hello, World!
     Hello, World!
 
