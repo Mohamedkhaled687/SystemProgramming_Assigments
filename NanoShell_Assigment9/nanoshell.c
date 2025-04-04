@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
         }
 
         /* Tokenization of the input string */
-        char *args[100];  // Limit to a reasonable number of arguments
+        char *args[BUF_SIZE / 2];
         char *token = strtok(buf, " ");
         int i = 0;
         while (token != NULL) {
@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
                     perror("setenv failed");
                 }
             }
-            continue;  // No forking required
+            continue; 
         }
 
         /* Handle export variable assignment: export x=5 */
@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
             } else {
                 printf("Usage: export Variable=Value (no spaces allowed)\n");
             }
-            continue;  // Handled as a built-in command; no fork needed.
+            continue; 
         }
 
         /* Variable Expansion: replace tokens starting with '$' with their environment value */
