@@ -7,16 +7,16 @@
 #include <errno.h>
 
 #define BUF_SIZE 1024
-#define true (char)1
 
 int main(int argc, char **argv)
 {
     char buf[BUF_SIZE];
 
-    while (true)
+    while (1)
     {
+
         // Display the shell prompt
-        printf("Nano Shell Prompt > ");
+        printf("Micro Shell Prompt > ");
         fflush(stdout);
 
         /* Read Input from User */
@@ -26,32 +26,53 @@ int main(int argc, char **argv)
             continue;
         }
 
-        // Remove the newline character at the end of the input
+        // Remove the newline character from the input
         buf[strcspn(buf, "\n")] = '\0';
 
         // Skip empty input
         if (strlen(buf) == 0)
             continue;
 
-        /* Check for the 'exit' command before processing */
+        // Check for the "exit" command
         if (strcmp(buf, "exit") == 0)
         {
             printf("Exiting shell...\n");
             exit(EXIT_SUCCESS);
         }
 
-        /* Tokenization of the input string */
-        char *args[BUF_SIZE / 2 + 1];
+        /* Tokenize the input string using the custom loop */
+        char *args[BUF_SIZE / 2]; // Command arguments (excluding redirection tokens)
+        char *input_file = NULL;
+        char *output_file = NULL;
+        char *error_file = NULL;
+        int arg_count = 0;
+
         char *token = strtok(buf, " ");
-        int i = 0;
-        while (token != NULL)
+        while (token)
         {
-            args[i++] = token;
+            if (strcmp(token, "<") == 0)
+            {
+                token = strtok(NULL, " ");
+                input_file = token;
+            }
+            else if (strcmp(token, ">") == 0)
+            {
+                token = strtok(NULL, " ");
+                output_file = token;
+            }
+            else if (strcmp(token, "2>") == 0)
+            {
+                token = strtok(NULL, " ");
+                error_file = token;
+            }
+            else
+            {
+                args[arg_count++] = token;
+            }
             token = strtok(NULL, " ");
         }
-        args[i] = NULL; // NULL-terminate the arguments array
+        args[arg_count] = NULL; // Terminate the argument list
 
-        /* Check for the 'cd' command before forking */
         if (strcmp(args[0], "cd") == 0)
         {
             if (args[1] == NULL)
@@ -73,7 +94,7 @@ int main(int argc, char **argv)
         {
             if (args[1] != NULL)
             {
-                fprintf(stderr, "Usage: Variable=Value (no spaces allowed)\n");
+                perror("Usage: Variable=Value (no spaces allowed)\n");
             }
             else
             {
@@ -94,7 +115,7 @@ int main(int argc, char **argv)
         {
             if (args[1] == NULL)
             {
-                fprintf(stderr, "Usage: export Variable=Value (no spaces allowed)\n");
+                perror("Usage: export Variable=Value (no spaces allowed)\n");
             }
             else if (strchr(args[1], '=') != NULL)
             {
@@ -109,16 +130,16 @@ int main(int argc, char **argv)
             }
             else
             {
-                fprintf(stderr, "Usage: export Variable=Value (no spaces allowed)\n");
+                perror("Usage: export Variable=Value (no spaces allowed)\n");
             }
             continue;
         }
 
-        for (int j = 0; j < i; j++)
+        for (int j = 0; j < arg_count; j++)
         {
             if (args[j][0] == '$')
             {
-                char *env_value = getenv(args[j] + 1);
+                char *env_value = getenv(args[j] + 1); // Skip the '$'
                 args[j] = env_value ? env_value : "";
             }
         }
@@ -128,60 +149,55 @@ int main(int argc, char **argv)
         if (pid > 0)
         { // Parent process
             int status;
-            wait(&status);
+            wait(&status); // Wait for the child process to finish
         }
         else if (pid == 0)
         { // Child process
 
-            /* IO redirection (performed in the child process) */
-            for (int j = 0; j < i; j++)
+            /* Perform IO redirection in the child process */
+            if (input_file != NULL)
             {
-                /* Output redirection: >filename */
-                if (args[j][0] == '>')
+                int fd_in = open(input_file, O_RDONLY);
+                if (fd_in < 0)
                 {
-                    char *output_file = args[j] + 1; // Skip the '>'
-                    int output_fd;
-                    if ((output_fd = open(output_file, O_CREAT | O_WRONLY | O_TRUNC, 0644)) < 0)
-                    {
-                        perror("Can't redirect the output");
-                        exit(EXIT_FAILURE);
-                    }
-                    dup2(output_fd, 1); // Redirect stdout to output_fd
-                    close(output_fd);
+                    perror("Error opening input file");
+                    exit(EXIT_FAILURE);
                 }
-                /* Input redirection: <filename */
-                else if (args[j][0] == '<')
-                {
-                    char *input_file = args[j] + 1; // Skip the '<'
-                    int input_fd;
-                    if ((input_fd = open(input_file, O_RDONLY)) < 0)
-                    {
-                        perror("Can't redirect the input");
-                        exit(EXIT_FAILURE);
-                    }
-                    dup2(input_fd, 0); // Redirect stdin to input_fd
-                    close(input_fd);
-                }
-                /* Error redirection: 2>filename */
-                else if (args[j][0] == '2' && args[j][1] == '>')
-                {
-                    char *error_file = args[j] + 2; // Skip the "2>"
-                    int error_fd;
-                    if ((error_fd = open(error_file, O_CREAT | O_WRONLY | O_TRUNC, 0644)) < 0)
-                    {
-                        perror("Can't redirect the error file");
-                        exit(EXIT_FAILURE);
-                    }
-                    dup2(error_fd, 2); // Redirect stderr to error_fd
-                    close(error_fd);
-                }
+                dup2(fd_in, STDIN_FILENO);
+                close(fd_in);
             }
+            if (output_file != NULL)
+            {
+                int fd_out = open(output_file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+                if (fd_out < 0)
+                {
+                    perror("Error opening output file");
+                    exit(EXIT_FAILURE);
+                }
+                dup2(fd_out, STDOUT_FILENO);
+                close(fd_out);
+            }
+            if (error_file != NULL)
+            {
+                int fd_err = open(error_file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+                if (fd_err < 0)
+                {
+                    perror("Error opening error file");
+                    exit(EXIT_FAILURE);
+                }
+                dup2(fd_err, STDERR_FILENO);
+                close(fd_err);
+            }
+
             execvp(args[0], args);
-            perror("Execution failed");
+            perror("execvp failed");
             exit(EXIT_FAILURE);
         }
         else
+        { // Fork failed
             perror("Fork failed");
+        }
     }
+
     return 0;
 }
