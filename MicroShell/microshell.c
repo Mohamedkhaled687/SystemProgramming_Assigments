@@ -77,7 +77,7 @@ int main(int argc, char **argv)
         {
             if (args[1] == NULL)
             {
-                fprintf(stderr, "cd: missing argument\n");
+                perror("cd: missing argument\n");
             }
             else
             {
