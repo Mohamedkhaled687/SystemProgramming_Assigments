@@ -34,10 +34,25 @@ int main(int argc, char **argv) {
         }
 
         /* Tokenization of the input string */
-        char *args[BUF_SIZE / 2];
+        int argsSize = 10; // initial capacity for tokens
+        char **args = malloc(argsSize * sizeof(char *));
+        if (args == NULL) {
+            perror("malloc failed");
+            exit(EXIT_FAILURE);
+        }
         char *token = strtok(buf, " ");
         int i = 0;
         while (token != NULL) {
+            if (i >= argsSize - 1) {  // Ensure room for the NULL terminator
+                argsSize *= 2;
+                char **temp = realloc(args, argsSize * sizeof(char *));
+                if (temp == NULL) {
+                    perror("realloc failed");
+                    free(args);
+                    exit(EXIT_FAILURE);
+                }
+                args = temp;
+            }
             args[i++] = token;
             token = strtok(NULL, " ");
         }
@@ -52,6 +67,7 @@ int main(int argc, char **argv) {
                     perror("cd failed");
                 }
             }
+            free(args);
             continue;  // Built-in; no need to fork
         }
 
@@ -69,6 +85,7 @@ int main(int argc, char **argv) {
                     perror("setenv failed");
                 }
             }
+            free(args);
             continue; 
         }
 
@@ -88,6 +105,7 @@ int main(int argc, char **argv) {
             } else {
                 printf("Usage: export Variable=Value (no spaces allowed)\n");
             }
+            free(args);
             continue; 
         }
 
@@ -112,13 +130,16 @@ int main(int argc, char **argv) {
             if (!WIFEXITED(status)) {
                 printf("Child process did not exit normally\n");
             }
+            free(args);
         } else if (pid == 0) {  // Child process
             execvp(args[0], args);
             // If execvp returns, an error occurred
             printf("Execution failed\n");
+            free(args);
             exit(EXIT_FAILURE);
         } else {  // Fork failed
             printf("Fork Failed\n");
+            free(args);
         }
     }
     return 0;
