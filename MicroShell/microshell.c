@@ -15,33 +15,33 @@ int main(int argc, char **argv)
 
     while (true)
     {
-        // Display the shell prompt
+        // Display the shell prompt and flush output.
         printf("Micro Shell Prompt > ");
         fflush(stdout);
 
-        /* Read Input from User */
+        /* Read input from the user */
         if (!fgets(buf, BUF_SIZE, stdin))
         {
             perror("Error reading input");
             continue;
         }
 
-        // Remove the newline character from the input
+        // Remove the newline character from the input.
         buf[strcspn(buf, "\n")] = '\0';
 
-        // Skip empty input
+        // Skip empty input.
         if (strlen(buf) == 0)
             continue;
 
-        // Check for the "exit" command
+        // Check for the "exit" command.
         if (strcmp(buf, "exit") == 0)
         {
             printf("Exiting shell...\n");
             exit(EXIT_SUCCESS);
         }
 
-        /* Tokenize the input string using the custom loop */
-        int argsSize = 10;  // initial capacity for tokens
+        /* Tokenize the input string using dynamic allocation */
+        int argsSize = 10;  // Initial capacity for tokens.
         char **args = malloc(argsSize * sizeof(char *));
         if (args == NULL) {
             perror("malloc failed");
@@ -55,6 +55,7 @@ int main(int argc, char **argv)
         char *token = strtok(buf, " ");
         while (token)
         {
+            // Handle I/O redirection tokens.
             if (strcmp(token, "<") == 0)
             {
                 token = strtok(NULL, " ");
@@ -72,7 +73,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                if (arg_count >= argsSize - 1) {  // Ensure space for the NULL terminator
+                if (arg_count >= argsSize - 1) {  // Ensure space for the NULL terminator.
                     argsSize *= 2;
                     char **temp = realloc(args, argsSize * sizeof(char *));
                     if (temp == NULL) {
@@ -86,13 +87,22 @@ int main(int argc, char **argv)
             }
             token = strtok(NULL, " ");
         }
-        args[arg_count] = NULL; // Terminate the argument list
+        args[arg_count] = NULL; // Terminate the argument list.
 
+        /* Detect improper variable assignment with spaces.*/
+        if (arg_count > 1 && strcmp(args[1], "=") == 0)
+        {
+            printf("Usage: Variable=Value (no spaces allowed)\n");
+            free(args);
+            continue;
+        }
+
+        /* Handle the built-in "cd" command */
         if (strcmp(args[0], "cd") == 0)
         {
             if (args[1] == NULL)
             {
-                perror("cd: missing argument\n");
+                printf("cd: missing argument\n");
             }
             else
             {
@@ -108,16 +118,16 @@ int main(int argc, char **argv)
         /* Handle variable assignment of the form x=5 (without export) */
         if (strchr(args[0], '=') != NULL)
         {
-            if (args[1] != NULL)
+            if (arg_count > 1)
             {
-                perror("Usage: Variable=Value (no spaces allowed)\n");
+                printf("Usage: Variable=Value (no spaces allowed)\n");
             }
             else
             {
                 char *eq = strchr(args[0], '=');
-                *eq = '\0';          // Terminate the variable name string
-                char *var = args[0]; // "x"
-                char *val = eq + 1;  // "5"
+                *eq = '\0';          // Terminate the variable name string.
+                char *var = args[0];   // e.g., "x"
+                char *val = eq + 1;    // e.g., "5"
                 if (setenv(var, val, 1) != 0)
                 {
                     perror("setenv failed");
@@ -132,32 +142,40 @@ int main(int argc, char **argv)
         {
             if (args[1] == NULL)
             {
-                perror("Usage: export Variable=Value (no spaces allowed)\n");
+                printf("Usage: export Variable=Value (no spaces allowed)\n");
             }
             else if (strchr(args[1], '=') != NULL)
             {
-                char *eq = strchr(args[1], '=');
-                *eq = '\0';
-                char *var = args[1]; // "x"
-                char *val = eq + 1;  // "5"
-                if (setenv(var, val, 1) != 0)
+                if (arg_count > 2)
                 {
-                    perror("setenv failed");
+                    printf("Usage: export Variable=Value (no spaces allowed)\n");
+                }
+                else
+                {
+                    char *eq = strchr(args[1], '=');
+                    *eq = '\0';
+                    char *var = args[1];   // e.g., "x"
+                    char *val = eq + 1;    // e.g., "5"
+                    if (setenv(var, val, 1) != 0)
+                    {
+                        perror("setenv failed");
+                    }
                 }
             }
             else
             {
-                perror("Usage: export Variable=Value (no spaces allowed)\n");
+                printf("Usage: export Variable=Value (no spaces allowed)\n");
             }
             free(args);
             continue;
         }
 
+        /* Variable Expansion: Replace tokens starting with '$' with their environment value */
         for (int j = 0; j < arg_count; j++)
         {
             if (args[j][0] == '$')
             {
-                char *env_value = getenv(args[j] + 1); // Skip the '$'
+                char *env_value = getenv(args[j] + 1); // Skip the '$'.
                 args[j] = env_value ? env_value : "";
             }
         }
@@ -165,15 +183,14 @@ int main(int argc, char **argv)
         /* Fork and execute external commands */
         pid_t pid = fork();
         if (pid > 0)
-        { // Parent process
+        {   // Parent process.
             int status;
-            wait(&status); // Wait for the child process to finish
+            wait(&status); // Wait for the child process to finish.
             free(args);
         }
         else if (pid == 0)
-        { // Child process
-
-            /* Perform IO redirection in the child process */
+        {   // Child process.
+            /* Perform I/O redirection if requested */
             if (input_file != NULL)
             {
                 int fd_in = open(input_file, O_RDONLY);
@@ -214,7 +231,7 @@ int main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
         else
-        { // Fork failed
+        {   // Fork failed.
             perror("Fork failed");
             free(args);
         }
