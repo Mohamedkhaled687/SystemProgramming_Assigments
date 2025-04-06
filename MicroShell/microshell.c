@@ -7,14 +7,14 @@
 #include <errno.h>
 
 #define BUF_SIZE 1024
+#define true (char)1
 
 int main(int argc, char **argv)
 {
     char buf[BUF_SIZE];
 
-    while (1)
+    while (true)
     {
-
         // Display the shell prompt
         printf("Micro Shell Prompt > ");
         fflush(stdout);
@@ -41,7 +41,12 @@ int main(int argc, char **argv)
         }
 
         /* Tokenize the input string using the custom loop */
-        char *args[BUF_SIZE / 2]; // Command arguments (excluding redirection tokens)
+        int argsSize = 10;  // initial capacity for tokens
+        char **args = malloc(argsSize * sizeof(char *));
+        if (args == NULL) {
+            perror("malloc failed");
+            exit(EXIT_FAILURE);
+        }
         char *input_file = NULL;
         char *output_file = NULL;
         char *error_file = NULL;
@@ -67,6 +72,16 @@ int main(int argc, char **argv)
             }
             else
             {
+                if (arg_count >= argsSize - 1) {  // Ensure space for the NULL terminator
+                    argsSize *= 2;
+                    char **temp = realloc(args, argsSize * sizeof(char *));
+                    if (temp == NULL) {
+                        perror("realloc failed");
+                        free(args);
+                        exit(EXIT_FAILURE);
+                    }
+                    args = temp;
+                }
                 args[arg_count++] = token;
             }
             token = strtok(NULL, " ");
@@ -86,6 +101,7 @@ int main(int argc, char **argv)
                     perror("cd failed");
                 }
             }
+            free(args);
             continue;
         }
 
@@ -107,6 +123,7 @@ int main(int argc, char **argv)
                     perror("setenv failed");
                 }
             }
+            free(args);
             continue;
         }
 
@@ -132,6 +149,7 @@ int main(int argc, char **argv)
             {
                 perror("Usage: export Variable=Value (no spaces allowed)\n");
             }
+            free(args);
             continue;
         }
 
@@ -150,6 +168,7 @@ int main(int argc, char **argv)
         { // Parent process
             int status;
             wait(&status); // Wait for the child process to finish
+            free(args);
         }
         else if (pid == 0)
         { // Child process
@@ -191,11 +210,13 @@ int main(int argc, char **argv)
 
             execvp(args[0], args);
             perror("execvp failed");
+            free(args);
             exit(EXIT_FAILURE);
         }
         else
         { // Fork failed
             perror("Fork failed");
+            free(args);
         }
     }
 
