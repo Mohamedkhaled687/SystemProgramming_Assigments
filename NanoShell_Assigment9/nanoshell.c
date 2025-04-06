@@ -20,8 +20,11 @@ int main(int argc, char **argv) {
             continue;
         }
 
-        // Remove the newline character at the end of the input
-        buf[strlen(buf) - 1] = '\0';
+        // Remove the newline character at the end of the input, if present
+        size_t len = strlen(buf);
+        if (len > 0 && buf[len - 1] == '\n') {
+            buf[len - 1] = '\0';
+        }
 
         // Skip empty input
         if (strlen(buf) == 0)
@@ -33,30 +36,38 @@ int main(int argc, char **argv) {
             exit(EXIT_SUCCESS);
         }
 
-        /* Tokenization of the input string */
-        int argsSize = 10; // initial capacity for tokens
-        char **args = malloc(argsSize * sizeof(char *));
-        if (args == NULL) {
-            perror("malloc failed");
-            exit(EXIT_FAILURE);
-        }
-        char *token = strtok(buf, " ");
+        /* Tokenize the input string */
+        char *args[100];
         int i = 0;
+        char *token = strtok(buf, " ");
         while (token != NULL) {
-            if (i >= argsSize - 1) {  // Ensure room for the NULL terminator
-                argsSize *= 2;
-                char **temp = realloc(args, argsSize * sizeof(char *));
-                if (temp == NULL) {
-                    perror("realloc failed");
-                    free(args);
-                    exit(EXIT_FAILURE);
-                }
-                args = temp;
-            }
             args[i++] = token;
             token = strtok(NULL, " ");
         }
         args[i] = NULL;  // NULL-terminate the arguments array
+
+    /*Check for putting space when setting variable*/
+        if (i > 1 && strcmp(args[1], "=") == 0) {
+            printf("Usage: Variable=Value (no spaces allowed)\n");
+            continue;
+        }
+
+        /* Variable assignment without spaces: e.g., x=5 */
+        if (strchr(args[0], '=') != NULL) {
+            // If there is more than one token, it means spaces were used
+            if (i > 1) {
+                printf("Usage: Variable=Value (no spaces allowed)\n");
+            } else {
+                char *eq = strchr(args[0], '=');
+                *eq = '\0';  // Split into variable name and value
+                char *var = args[0];
+                char *val = eq + 1;
+                if (setenv(var, val, 1) != 0) {
+                    perror("setenv failed");
+                }
+            }
+            continue;
+        }
 
         /* Check for the 'cd' command before forking */
         if (strcmp(args[0], "cd") == 0) {
@@ -67,26 +78,7 @@ int main(int argc, char **argv) {
                     perror("cd failed");
                 }
             }
-            free(args);
-            continue;  // Built-in; no need to fork
-        }
-
-        /* Handle variable assignment of the form x=5 (without export) */
-        if (strchr(args[0], '=') != NULL) {
-            if (args[1] != NULL) {
-                printf("Usage: Variable=Value (no spaces allowed)\n");
-            } else {
-                // Split "x=5" into variable and value and use setenv to store it.
-                char *eq = strchr(args[0], '=');
-                *eq = '\0';               // Terminate the variable name string
-                char *var = args[0];        // "x"
-                char *val = eq + 1;         // "5"
-                if (setenv(var, val, 1) != 0) {
-                    perror("setenv failed");
-                }
-            }
-            free(args);
-            continue; 
+            continue;
         }
 
         /* Handle export variable assignment: export x=5 */
@@ -94,25 +86,27 @@ int main(int argc, char **argv) {
             if (args[1] == NULL) {
                 printf("Usage: export Variable=Value (no spaces allowed)\n");
             } else if (strchr(args[1], '=') != NULL) {
-                // Split "x=5" into variable and value
-                char *eq = strchr(args[1], '=');
-                *eq = '\0';
-                char *var = args[1];       // "x"
-                char *val = eq + 1;        // "5"
-                if (setenv(var, val, 1) != 0) {
-                    perror("setenv failed");
+                // If there are extra tokens, it means spaces were used
+                if (i > 2) {
+                    printf("Usage: export Variable=Value (no spaces allowed)\n");
+                } else {
+                    char *eq = strchr(args[1], '=');
+                    *eq = '\0';  // Split into variable name and value
+                    char *var = args[1];
+                    char *val = eq + 1;
+                    if (setenv(var, val, 1) != 0) {
+                        perror("setenv failed");
+                    }
                 }
             } else {
                 printf("Usage: export Variable=Value (no spaces allowed)\n");
             }
-            free(args);
-            continue; 
+            continue;
         }
 
-        /* Variable Expansion: replace tokens starting with '$' with their environment value */
+        /* Variable Expansion: Replace tokens starting with '$' with their environment value */
         for (int j = 0; j < i; j++) {
             if (args[j][0] == '$') {
-                // Remove the '$' and get the environment variable's value
                 char *env_value = getenv(args[j] + 1);
                 if (env_value) {
                     args[j] = env_value;
@@ -130,16 +124,13 @@ int main(int argc, char **argv) {
             if (!WIFEXITED(status)) {
                 printf("Child process did not exit normally\n");
             }
-            free(args);
         } else if (pid == 0) {  // Child process
             execvp(args[0], args);
             // If execvp returns, an error occurred
             printf("Execution failed\n");
-            free(args);
             exit(EXIT_FAILURE);
         } else {  // Fork failed
             printf("Fork Failed\n");
-            free(args);
         }
     }
     return 0;
