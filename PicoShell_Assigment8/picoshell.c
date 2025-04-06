@@ -36,11 +36,25 @@ int main(int argc, char **argv) {
         }
 
         /* Tokenization of the input string */
-        char *args[100];  
+        int argsSize = 10; // initial capacity for tokens
+        char **args = malloc(argsSize * sizeof(char *));
+        if (args == NULL) {
+            perror("malloc failed");
+            exit(EXIT_FAILURE);
+        }
         char *token = strtok(buf, " ");
         int i = 0;
-
         while (token != NULL) {
+            if (i >= argsSize - 1) {  // Need more mem for the NULL terminator
+                argsSize *= 2;
+                char **temp = realloc(args, argsSize * sizeof(char *));
+                if (temp == NULL) {
+                    perror("realloc failed");
+                    free(args);
+                    exit(EXIT_FAILURE);
+                }
+                args = temp;
+            }
             args[i++] = token;
             token = strtok(NULL, " ");
         }
@@ -55,6 +69,7 @@ int main(int argc, char **argv) {
                     perror("cd failed");
                 }
             }
+            free(args);
             continue;
         }
 
@@ -68,14 +83,17 @@ int main(int argc, char **argv) {
             if (!WIFEXITED(status)) {
                 printf("Cannot suspend the execution of the current thread\n");
             }
+            free(args);
         } 
         else if (pid == 0) {  // Child process
             execvp(args[0], args);
             printf("Execution failed\n");
+            free(args);
             exit(EXIT_FAILURE);
         } 
         else {  // Fork failed
             printf("Fork Failed\n");
+            free(args);
         }
     }
 
